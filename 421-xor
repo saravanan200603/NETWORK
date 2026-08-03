@@ -1,0 +1,82 @@
+#421. Maximum XOR of Two Numbers in an Array
+
+Given an integer array nums, return the maximum result of nums[i] XOR nums[j], where 0 <= i <= j < n.
+
+#include <stdlib.h>
+
+typedef struct Trie
+{
+    struct Trie *child[2];
+} Trie;
+
+Trie* createNode()
+{
+    Trie *node = (Trie *)malloc(sizeof(Trie));
+    node->child[0] = NULL;
+    node->child[1] = NULL;
+    return node;
+}
+
+void insert(Trie *root, int num)
+{
+    Trie *curr = root;
+
+    for (int i = 31; i >= 0; i--)
+    {
+        int bit = (num >> i) & 1;
+
+        if (curr->child[bit] == NULL)
+        {
+            curr->child[bit] = createNode();
+        }
+
+        curr = curr->child[bit];
+    }
+}
+
+int findMaxXor(Trie *root, int num)
+{
+    Trie *curr = root;
+    int xorValue = 0;
+
+    for (int i = 31; i >= 0; i--)
+    {
+        int bit = (num >> i) & 1;
+
+        if (curr->child[1 - bit] != NULL)
+        {
+            xorValue |= (1 << i);
+            curr = curr->child[1 - bit];
+        }
+        else
+        {
+            curr = curr->child[bit];
+        }
+    }
+
+    return xorValue;
+}
+
+int findMaximumXOR(int* nums, int numsSize)
+{
+    Trie *root = createNode();
+
+    for (int i = 0; i < numsSize; i++)
+    {
+        insert(root, nums[i]);
+    }
+
+    int maxXor = 0;
+
+    for (int i = 0; i < numsSize; i++)
+    {
+        int value = findMaxXor(root, nums[i]);
+
+        if (value > maxXor)
+        {
+            maxXor = value;
+        }
+    }
+
+    return maxXor;
+}
