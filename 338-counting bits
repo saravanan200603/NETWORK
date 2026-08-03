@@ -1,0 +1,20 @@
+#338 -COUNTING BITS -LEETCODE
+Given an integer n, return an array ans of length n + 1 such that for each i (0 <= i <= n), ans[i] is the number of 1's in the binary representation of i.
+
+#include <stdlib.h>
+
+int* countBits(int n, int* returnSize)
+{
+    *returnSize = n + 1;
+
+    int *ans = (int *)malloc((n + 1) * sizeof(int));
+
+    ans[0] = 0;
+
+    for (int i = 1; i <= n; i++)
+    {
+        ans[i] = ans[i / 2] + (i % 2);
+    }
+
+    return ans;
+}
