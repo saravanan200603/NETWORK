@@ -1,0 +1,107 @@
+EXERCISE 2 (SELF QUESTION)  CRC
+#include <stdio.h>
+#include <string.h>
+
+char data[100], divisor[30];
+char dividend[150], remainder[30];
+char codeword[150], received[150];
+
+void xorOperation(int pos, int len)
+{
+    for(int i = 0; i < len; i++)
+    {
+        if(dividend[pos + i] == divisor[i])
+            dividend[pos + i] = '0';
+        else
+            dividend[pos + i] = '1';
+    }
+}
+
+void calculateCRC(char input[])
+{
+    strcpy(dividend, input);
+
+    int dataLen = strlen(input);
+    int divLen = strlen(divisor);
+
+    for(int i = 0; i < divLen - 1; i++)
+        dividend[dataLen + i] = '0';
+
+    dividend[dataLen + divLen - 1] = '\0';
+
+    char temp[150];
+    strcpy(temp, dividend);
+
+    for(int i = 0; i <= dataLen - 1; i++)
+    {
+        if(temp[i] == '1')
+        {
+            for(int j = 0; j < divLen; j++)
+            {
+                if(temp[i + j] == divisor[j])
+                    temp[i + j] = '0';
+                else
+                    temp[i + j] = '1';
+            }
+        }
+    }
+
+    strncpy(remainder, temp + dataLen, divLen - 1);
+    remainder[divLen - 1] = '\0';
+
+    strcpy(codeword, input);
+    strcat(codeword, remainder);
+}
+
+void receiverCRC()
+{
+    strcpy(dividend, received);
+
+    int len = strlen(received);
+    int divLen = strlen(divisor);
+
+    for(int i = 0; i <= len - divLen; i++)
+    {
+        if(dividend[i] == '1')
+        {
+            xorOperation(i, divLen);
+        }
+    }
+
+    int error = 0;
+
+    printf("\nRemainder : ");
+
+    for(int i = len - divLen + 1; i < len; i++)
+    {
+        printf("%c", dividend[i]);
+        if(dividend[i] != '0')
+            error = 1;
+    }
+
+    if(error)
+        printf("\nStatus : Error Detected\n");
+    else
+        printf("\nStatus : No Error\n");
+}
+
+int main()
+{
+    printf("Enter Sender Binary Data : ");
+    scanf("%s", data);
+
+    printf("Enter Generator Polynomial : ");
+    scanf("%s", divisor);
+
+    calculateCRC(data);
+
+    printf("\nCRC Remainder : %s", remainder);
+    printf("\nTransmitted Codeword : %s\n", codeword);
+
+    printf("\nEnter Received Codeword : ");
+    scanf("%s", received);
+
+    receiverCRC();
+
+    return 0;
+}
