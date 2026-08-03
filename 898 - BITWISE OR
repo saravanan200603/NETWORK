@@ -1,0 +1,59 @@
+EXERICSE 2 (MEDIUM ) 898. Bitwise ORs of Subarrays
+#include <stdlib.h>
+
+int subarrayBitwiseORs(int* arr, int arrSize)
+{
+    int *prev = (int *)malloc(32 * sizeof(int));
+    int *curr = (int *)malloc(32 * sizeof(int));
+    int prevSize = 0, currSize = 0;
+
+    int *all = (int *)malloc(arrSize * 32 * sizeof(int));
+    int allSize = 0;
+
+    for (int i = 0; i < arrSize; i++)
+    {
+        currSize = 0;
+
+        curr[currSize++] = arr[i];
+
+        for (int j = 0; j < prevSize; j++)
+        {
+            int value = prev[j] | arr[i];
+
+            if (value != curr[currSize - 1])
+            {
+                curr[currSize++] = value;
+            }
+        }
+
+        for (int j = 0; j < currSize; j++)
+        {
+            int found = 0;
+
+            for (int k = 0; k < allSize; k++)
+            {
+                if (all[k] == curr[j])
+                {
+                    found = 1;
+                    break;
+                }
+            }
+
+            if (!found)
+            {
+                all[allSize++] = curr[j];
+            }
+        }
+
+        int *temp = prev;
+        prev = curr;
+        curr = temp;
+        prevSize = currSize;
+    }
+
+    free(prev);
+    free(curr);
+    free(all);
+
+    return allSize;
+}
