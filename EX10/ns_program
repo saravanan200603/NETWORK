@@ -1,0 +1,163 @@
+#include "ns3/core-module.h"
+#include "ns3/network-module.h"
+#include "ns3/internet-module.h"
+#include "ns3/point-to-point-module.h"
+#include "ns3/applications-module.h"
+#include "ns3/flow-monitor-module.h"
+#include <fstream>
+
+using namespace ns3;
+
+NS_LOG_COMPONENT_DEFINE ("Tcp10NodeSim");
+
+static Ptr<OutputStreamWrapper> cwndStream;
+
+static void CwndChange (uint32_t oldCwnd, uint32_t newCwnd) {
+    if (cwndStream && cwndStream->GetStream ()) {
+        *cwndStream->GetStream () << Simulator::Now ().GetSeconds () << "\t" << newCwnd << std::endl;
+    }
+}
+
+static void TraceCwnd (std::string cwndPrintFilename) {
+    AsciiTraceHelper ascii;
+    cwndStream = ascii.CreateFileStream (cwndPrintFilename);
+    Config::ConnectWithoutContext ("/NodeList/0/$ns3::TcpL4Protocol/SocketList/0/CongestionWindow", MakeCallback (&CwndChange));
+}
+
+// Separate function for Throughput
+void EvaluateThroughput (uint64_t rxBytes, uint32_t simTime) {
+    double throughput = (rxBytes * 8.0) / (simTime * 1024.0 * 1024.0);
+    std::cout << "Throughput: " << throughput << " Mbps\n";
+}
+
+// Separate function for PDR
+void EvaluatePDR (uint32_t txPackets, uint32_t rxPackets) {
+    double pdr = (txPackets > 0) ? ((double) rxPackets / txPackets) * 100.0 : 0.0;
+    std::cout << "Packet Delivery Ratio (PDR): " << pdr << " %\n";
+}
+
+// Separate function for End-to-End Delay
+void EvaluateDelay (Time delaySum, uint32_t rxPackets) {
+    double delay = (rxPackets > 0) ? (delaySum.GetSeconds () / rxPackets) : 0.0;
+    std::cout << "Mean End-to-End Delay: " << delay << " s\n";
+}
+
+// Separate function for Packet Loss
+void EvaluateLoss (uint32_t lostPackets, uint32_t txPackets) {
+    double lossRate = (txPackets > 0) ? ((double) lostPackets / txPackets) * 100.0 : 0.0;
+    std::cout << "Packet Loss: " << lostPackets << " packets (" << lossRate << " %)\n";
+}
+
+// Separate function for Congestion Window tracking status
+void EvaluateCwndVariation (std::string filename) {
+    std::cout << "Congestion Window (cwnd) Variation: Saved trace to '" << filename << "'\n";
+}
+
+int main (int argc, char *argv[]) {
+    uint32_t simTime = 20;
+    CommandLine cmd;
+    cmd.AddValue ("simTime", "Simulation time in seconds", simTime);
+    cmd.Parse (argc, argv);
+
+    // ==========================================
+    // SEPARATE CALLS FOR CREATING NODES (10 NODES)
+    // ==========================================
+    Ptr<Node> n0 = CreateObject<Node> ();
+    Ptr<Node> n1 = CreateObject<Node> ();
+    Ptr<Node> n2 = CreateObject<Node> ();
+    Ptr<Node> n3 = CreateObject<Node> ();
+    Ptr<Node> n4 = CreateObject<Node> ();
+    Ptr<Node> n5 = CreateObject<Node> ();
+    Ptr<Node> n6 = CreateObject<Node> ();
+    Ptr<Node> n7 = CreateObject<Node> ();
+    Ptr<Node> n8 = CreateObject<Node> ();
+    Ptr<Node> n9 = CreateObject<Node> ();
+
+    NodeContainer nodes;
+    nodes.Add (n0); nodes.Add (n1); nodes.Add (n2); nodes.Add (n3); nodes.Add (n4);
+    nodes.Add (n5); nodes.Add (n6); nodes.Add (n7); nodes.Add (n8); nodes.Add (n9);
+
+    // Link Helpers
+    PointToPointHelper p2pBottleneck;
+    p2pBottleneck.SetDeviceAttribute ("DataRate", StringValue ("2Mbps"));
+    p2pBottleneck.SetChannelAttribute ("Delay", StringValue ("20ms"));
+    p2pBottleneck.SetQueue ("ns3::DropTailQueue<Packet>", "MaxSize", QueueSizeValue (QueueSize ("20p")));
+
+    PointToPointHelper p2pFast;
+    p2pFast.SetDeviceAttribute ("DataRate", StringValue ("100Mbps"));
+    p2pFast.SetChannelAttribute ("Delay", StringValue ("2ms"));
+
+    // ==========================================
+    // SEPARATE CALLS FOR CREATING LINKS (10-Node Chain)
+    // ==========================================
+    NetDeviceContainer link01 = p2pBottleneck.Install (n0, n1);
+    NetDeviceContainer link12 = p2pFast.Install (n1, n2);
+    NetDeviceContainer link23 = p2pFast.Install (n2, n3);
+    NetDeviceContainer link34 = p2pFast.Install (n3, n4);
+    NetDeviceContainer link45 = p2pBottleneck.Install (n4, n5);
+    NetDeviceContainer link56 = p2pFast.Install (n5, n6);
+    NetDeviceContainer link67 = p2pFast.Install (n6, n7);
+    NetDeviceContainer link78 = p2pFast.Install (n7, n8);
+    NetDeviceContainer link89 = p2pFast.Install (n8, n9);
+
+    InternetStackHelper stack;
+    stack.Install (nodes);
+
+    Ipv4AddressHelper addr;
+    addr.SetBase ("10.1.1.0", "255.255.255.0"); Ipv4InterfaceContainer i01 = addr.Assign (link01);
+    addr.SetBase ("10.1.2.0", "255.255.255.0"); addr.Assign (link12);
+    addr.SetBase ("10.1.3.0", "255.255.255.0"); addr.Assign (link23);
+    addr.SetBase ("10.1.4.0", "255.255.255.0"); addr.Assign (link34);
+    addr.SetBase ("10.1.5.0", "255.255.255.0"); addr.Assign (link45);
+    addr.SetBase ("10.1.6.0", "255.255.255.0"); addr.Assign (link56);
+    addr.SetBase ("10.1.7.0", "255.255.255.0"); addr.Assign (link67);
+    addr.SetBase ("10.1.8.0", "255.255.255.0"); addr.Assign (link78);
+    addr.SetBase ("10.1.9.0", "255.255.255.0"); Ipv4InterfaceContainer i89 = addr.Assign (link89);
+
+    Ipv4GlobalRoutingHelper::PopulateRoutingTables ();
+
+    uint16_t port = 5000;
+    Ipv4Address targetIp = i89.GetAddress (1);
+    BulkSendHelper source ("ns3::TcpSocketFactory", InetSocketAddress (targetIp, port));
+    source.SetAttribute ("MaxBytes", UintegerValue (0));
+    source.SetAttribute ("SendSize", UintegerValue (1024));
+    ApplicationContainer sourceApps = source.Install (n0);
+    sourceApps.Start (Seconds (1.0));
+    sourceApps.Stop (Seconds (simTime));
+
+    PacketSinkHelper sink ("ns3::TcpSocketFactory", InetSocketAddress (Ipv4Address::GetAny (), port));
+    ApplicationContainer sinkApps = sink.Install (n9);
+    sinkApps.Start (Seconds (0.0));
+    sinkApps.Stop (Seconds (simTime));
+
+    Simulator::Schedule (Seconds (1.01), &TraceCwnd, "tcp-cwnd.dat");
+
+    FlowMonitorHelper flowmon;
+    Ptr<FlowMonitor> monitor = flowmon.InstallAll ();
+
+    Simulator::Stop (Seconds (simTime));
+    Simulator::Run ();
+
+    monitor->CheckForLostPackets ();
+    Ptr<Ipv4FlowClassifier> classifier = DynamicCast<Ipv4FlowClassifier> (flowmon.GetClassifier ());
+    std::map<FlowId, FlowMonitor::FlowStats> stats = monitor->GetFlowStats ();
+
+    std::cout << "\n================ PERFORMANCE EVALUATION RESULTS ================\n";
+    for (auto i = stats.begin (); i != stats.end (); ++i) {
+        Ipv4FlowClassifier::FiveTuple t = classifier->FindFlow (i->first);
+        if (t.sourceAddress == i01.GetAddress (0) && t.destinationAddress == targetIp) {
+            std::cout << "Flow ID " << i->first << " (" << t.sourceAddress << " -> " << t.destinationAddress << ")\n";
+
+            // SEPARATE FUNCTION CALLS FOR EACH FUNCTIONALITY REQUIRED:
+            EvaluateThroughput (i->second.rxBytes, simTime);
+            EvaluatePDR (i->second.txPackets, i->second.rxPackets);
+            EvaluateDelay (i->second.delaySum, i->second.rxPackets);
+            EvaluateLoss (i->second.lostPackets, i->second.txPackets);
+            EvaluateCwndVariation ("tcp-cwnd.dat");
+        }
+    }
+    std::cout << "================================================================\n\n";
+
+    monitor->SerializeToXmlFile ("tcp-flowmon.xml", true, true);
+    Simulator::Destroy ();
+    return 0;
